@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "712258796614",
+    "project_id": "placementactcell-6229f",
+    "storage_bucket": "placementactcell-6229f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:712258796614:android:b11437de7f39960e4ade47",
+        "android_client_info": {
+          "package_name": "com.example.placement_act_cell"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_56Ppt7iy2FSz_jqdKB2nsZDS49wsXAA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
