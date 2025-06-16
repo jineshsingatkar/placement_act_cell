@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../widgets/role_button.dart';
 
 class LandingPage extends StatelessWidget {
+  const LandingPage({super.key}); // ✅ Add const here if it's not already
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
