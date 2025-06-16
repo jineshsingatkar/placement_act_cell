@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'student_profile_completion.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import 'student_profile_completion.dart';
+import 'company_profile_completion.dart';
+import 'company_dashboard.dart';
 
 class LoginSignupPage extends StatefulWidget {
   final String role;
+
   const LoginSignupPage({required this.role, super.key});
 
   @override
   State<LoginSignupPage> createState() => _LoginSignupPageState();
 }
 
-class _LoginSignupPageState extends State<LoginSignupPage> with SingleTickerProviderStateMixin {
+class _LoginSignupPageState extends State<LoginSignupPage>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final _loginKey = GlobalKey<FormState>();
   final _signupKey = GlobalKey<FormState>();
@@ -20,7 +25,6 @@ class _LoginSignupPageState extends State<LoginSignupPage> with SingleTickerProv
   String password = '';
   String name = '';
   String phone = '';
-  String companyName = '';
 
   @override
   void initState() {
@@ -30,19 +34,167 @@ class _LoginSignupPageState extends State<LoginSignupPage> with SingleTickerProv
   }
 
   void showErrorDialog(String title, String content) {
-    showDialog(context: context, builder: (_) => AlertDialog(
-      title: Text(title),
-      content: Text(content),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
-    ));
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+        ],
+      ),
+    );
   }
 
   Future<void> handleLogin() async {
     if (_loginKey.currentState!.validate()) {
       final error = await AuthService.signIn(email: email, password: password);
+      if (!mounted) return;
+      
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login successful')));
-        // TODO: Navigate to dashboard
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login successful')),
+        );
+
+        if (widget.role == 'TPO') {
+          Navigator.pushReplacementNamed(context, '/tpo_dashboard');
+          return;
+        }
+
+        if (widget.role == 'Student') {
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          
+          // First check if student is in pending_students collection
+          final pendingDoc = await FirebaseFirestore.instance
+              .collection('pending_students')
+              .doc(uid)
+              .get();
+
+          if (!mounted) return;
+
+          if (pendingDoc.exists) {
+            // Student is pending approval
+            showDialog(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text("Pending Approval"),
+                content: const Text("Your profile is under review by the TPO."),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("OK"),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
+          // Check if student is in approved students collection
+          final approvedDoc = await FirebaseFirestore.instance
+              .collection('students')
+              .doc(uid)
+              .get();
+
+          if (!mounted) return;
+
+          final data = approvedDoc.data();
+
+          if (data == null) {
+            // Show profile completion if no record found
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StudentProfileCompletionPage(fullName: 'Unknown'),
+              ),
+            );
+          } else {
+            final status = data['status'];
+            if (status == 'approved') {
+              Navigator.pushReplacementNamed(context, '/student_dashboard');
+            } else if (status == 'rejected') {
+              showErrorDialog("Rejected", "Your profile was rejected by the TPO.");
+            } else {
+              // Fallback for any other status
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StudentProfileCompletionPage(fullName: data['fullName'] ?? 'Unknown'),
+                ),
+              );
+            }
+          }
+        }
+
+        if (widget.role == 'Company') {
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          
+          // First check if company is in pending_companies collection
+          final pendingDoc = await FirebaseFirestore.instance
+              .collection('pending_companies')
+              .doc(uid)
+              .get();
+
+          if (!mounted) return;
+
+          if (pendingDoc.exists) {
+            // Company is pending approval
+            showDialog(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text("Pending Approval"),
+                content: const Text("Your company profile is under review by the TPO."),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("OK"),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
+          // Check if company is in approved companies collection
+          final approvedDoc = await FirebaseFirestore.instance
+              .collection('companies')
+              .doc(uid)
+              .get();
+
+          if (!mounted) return;
+
+          final data = approvedDoc.data();
+
+          if (data == null) {
+            // Show profile completion if no record found
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CompanyProfileCompletionPage(companyName: 'Unknown'),
+              ),
+            );
+          } else {
+            final status = data['status'];
+            if (status == 'approved') {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CompanyDashboardPage(),
+                ),
+              );
+            } else if (status == 'rejected') {
+              showErrorDialog("Rejected", "Your company profile was rejected by the TPO.");
+            } else {
+              // Fallback for any other status
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CompanyProfileCompletionPage(companyName: data['name'] ?? 'Unknown'),
+                ),
+              );
+            }
+          }
+        }
       } else {
         showErrorDialog("Login Failed", error);
       }
@@ -52,13 +204,28 @@ class _LoginSignupPageState extends State<LoginSignupPage> with SingleTickerProv
   Future<void> handleSignup() async {
     if (_signupKey.currentState!.validate()) {
       final error = await AuthService.signUp(email: email, password: password);
+      if (!mounted) return;
+      
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Signup successful')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signup successful')),
+        );
 
         if (widget.role == 'Student') {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const StudentProfileCompletionPage()),
+            MaterialPageRoute(
+              builder: (_) => StudentProfileCompletionPage(fullName: name),
+            ),
+          );
+        }
+
+        if (widget.role == 'Company') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CompanyProfileCompletionPage(companyName: name),
+            ),
           );
         }
       } else {
@@ -68,123 +235,102 @@ class _LoginSignupPageState extends State<LoginSignupPage> with SingleTickerProv
   }
 
   Widget loginTab() {
-    bool isTPO = widget.role == 'TPO';
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(24),
       child: Form(
         key: _loginKey,
-        child: Column(children: [
-          const SizedBox(height: 20),
-          TextFormField(
-            decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)),
-            onChanged: (v) => email = v,
-            validator: (v) => v != null && v.contains('@') ? null : 'Email required',
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock)),
-            onChanged: (v) => password = v,
-            validator: (v) => v != null && v.length >= 6 ? null : 'Min 6 chars',
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: handleLogin,
-            child: const Text('Login', style: TextStyle(fontSize: 18)),
-            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () async {
-                if (email.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Email needed")));
-                  return;
-                }
-                final error = await AuthService.resetPassword(email: email);
-                if (error == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Reset link sent to $email")));
-                } else {
-                  showErrorDialog("Reset Failed", error);
-                }
-              },
-              child: const Text("Forgot Password?"),
+        child: Column(
+          children: [
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Email'),
+              onChanged: (v) => email = v,
+              validator: (v) =>
+              v != null && v.contains('@') ? null : 'Enter valid email',
             ),
-          ),
-          if (!isTPO)
-            const Text("Can't reset? Contact your TPO.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey)),
-        ]),
+            const SizedBox(height: 16),
+            TextFormField(
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Password'),
+              onChanged: (v) => password = v,
+              validator: (v) =>
+              v != null && v.length >= 6 ? null : 'Min 6 characters',
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: handleLogin,
+              child: const Text('Login'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget signupTab() {
-    bool isCompany = widget.role == 'Company';
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(24),
       child: Form(
         key: _signupKey,
-        child: Column(children: [
-          const SizedBox(height: 20),
-          if (isCompany) ...[
+        child: Column(
+          children: [
             TextFormField(
-              decoration: const InputDecoration(labelText: 'Company Name', prefixIcon: Icon(Icons.business)),
-              onChanged: (v) => companyName = v,
-              validator: (v) => v != null && v.isNotEmpty ? null : '"Required',
+              decoration: InputDecoration(
+                labelText: widget.role == 'Company' ? 'Company Name' : 'Full Name',
+              ),
+              onChanged: (v) => name = v,
+              validator: (v) =>
+              v != null && v.isNotEmpty ? null : 'Required',
             ),
             const SizedBox(height: 16),
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Email'),
+              onChanged: (v) => email = v,
+              validator: (v) =>
+              v != null && v.contains('@') ? null : 'Invalid email',
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Phone Number'),
+              keyboardType: TextInputType.phone,
+              onChanged: (v) => phone = v,
+              validator: (v) =>
+              v != null && v.length >= 10 ? null : 'Invalid phone',
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Password'),
+              onChanged: (v) => password = v,
+              validator: (v) =>
+              v != null && v.length >= 6 ? null : 'Min 6 characters',
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: handleSignup,
+              child: const Text('Signup'),
+            ),
           ],
-          TextFormField(
-            decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person)),
-            onChanged: (v) => name = v,
-            validator: (v) => v != null && v.isNotEmpty ? null : 'Required',
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)),
-            onChanged: (v) => email = v,
-            validator: (v) => v != null && v.contains('@') ? null : 'Invalid email',
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone)),
-            keyboardType: TextInputType.phone,
-            onChanged: (v) => phone = v,
-            validator: (v) => v != null && v.length >= 10 ? null : 'Invalid phone',
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock)),
-            onChanged: (v) => password = v,
-            validator: (v) => v != null && v.length >= 6 ? null : 'Min 6 chars',
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: handleSignup,
-            child: const Text('Signup', style: TextStyle(fontSize: 18)),
-            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-          ),
-        ]),
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isTPO = widget.role == 'TPO';
+    final isTPO = widget.role == 'TPO';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.role} Portal', style: GoogleFonts.poppins()),
-        centerTitle: true,
+        title: Text('${widget.role} Portal'),
         bottom: TabBar(
-            controller: _tabController,
-            tabs: isTPO ? const [Tab(text: 'Login')] : const [Tab(text: 'Login'), Tab(text: 'Signup')]),
+          controller: _tabController,
+          tabs: isTPO
+              ? const [Tab(text: 'Login')]
+              : const [Tab(text: 'Login'), Tab(text: 'Signup')],
+        ),
       ),
-      body: TabBarView(controller: _tabController,
+      body: TabBarView(
+        controller: _tabController,
         children: isTPO ? [loginTab()] : [loginTab(), signupTab()],
       ),
     );

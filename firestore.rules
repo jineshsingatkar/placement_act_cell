@@ -1,0 +1,63 @@
+rules_version='2'
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read and write their own profile data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Students can read and write their own data
+    match /students/{studentId} {
+      allow read, write: if request.auth != null && request.auth.uid == studentId;
+      // Companies can read student profiles for job applications
+      allow read: if request.auth != null && exists(/databases/$(database)/documents/companies/$(request.auth.uid));
+    }
+    
+    // Companies can read and write their own data
+    match /companies/{companyId} {
+      allow read, write: if request.auth != null && request.auth.uid == companyId;
+      // Students can read company profiles
+      allow read: if request.auth != null && exists(/databases/$(database)/documents/students/$(request.auth.uid));
+    }
+    
+    // Job postings - companies can create their own, everyone can read
+    match /jobs/{jobId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        exists(/databases/$(database)/documents/companies/$(request.auth.uid));
+      allow update, delete: if request.auth != null && 
+        exists(/databases/$(database)/documents/companies/$(request.auth.uid)) &&
+        resource.data.companyId == request.auth.uid;
+    }
+    
+    // Job applications - students can create, companies can read their job applications
+    match /applications/{applicationId} {
+      allow read: if request.auth != null && (
+        exists(/databases/$(database)/documents/students/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/companies/$(request.auth.uid)) &&
+         resource.data.companyId == request.auth.uid)
+      );
+      allow create: if request.auth != null && 
+        exists(/databases/$(database)/documents/students/$(request.auth.uid)) &&
+        request.resource.data.studentId == request.auth.uid;
+      allow update: if request.auth != null && 
+        exists(/databases/$(database)/documents/companies/$(request.auth.uid)) &&
+        resource.data.companyId == request.auth.uid;
+    }
+    
+    // Admin functions for managing pending approvals
+    match /pending_students/{studentId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /pending_companies/{companyId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Admin collection for admin users
+    match /admins/{adminId} {
+      allow read, write: if request.auth != null && request.auth.uid == adminId;
+    }
+  }
+}
