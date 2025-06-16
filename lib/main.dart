@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/landing_page.dart';
+import 'screens/tpo_dashboard.dart';
+import 'screens/student_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(PlacementActCellApp());
+  runApp(const PlacementActCellApp());
 }
 
 class PlacementActCellApp extends StatelessWidget {
+  const PlacementActCellApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'PlacementActCell',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: LandingPage(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const LandingPage(),
+        '/tpo_dashboard': (context) => const TPODashboardPage(),
+        '/student_dashboard': (context) => const StudentDashboardPage(),
+        // You can add more like:
+        // '/company_dashboard': (context) => const CompanyDashboardPage(),
+      },
     );
   }
 }
