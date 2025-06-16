@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'pending_students_page.dart';
 import 'pending_companies_page.dart';
+import 'tpo_job_postings_page.dart';
 
 
 class TPODashboardPage extends StatelessWidget {
@@ -73,9 +74,9 @@ class TPODashboardPage extends StatelessWidget {
                   title: 'Job Postings',
                   subtitle: 'Manage job descriptions',
                   onTap: () {
-                    // TODO: Navigate to job postings management
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Coming soon!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TPOJobPostingsPage()),
                     );
                   },
                 ),

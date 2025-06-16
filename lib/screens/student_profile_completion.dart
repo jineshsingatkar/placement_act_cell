@@ -45,7 +45,8 @@ class _StudentProfileCompletionPageState
       }
 
       try {
-        await FirebaseFirestore.instance.collection('students').doc(uid).set({
+        await FirebaseFirestore.instance.collection('pending_students').doc(uid).set({
+          'uid': uid,
           'fullName': widget.fullName,
           'rollNo': rollNo,
           'branch': branch,
@@ -53,6 +54,7 @@ class _StudentProfileCompletionPageState
           'backlogs': backlogs,
           'phone': phone,
           'status': 'pending',
+          'createdAt': FieldValue.serverTimestamp(),
         });
 
         if (!mounted) return;

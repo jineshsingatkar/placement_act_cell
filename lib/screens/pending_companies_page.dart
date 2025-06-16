@@ -4,53 +4,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class PendingCompaniesPage extends StatelessWidget {
   const PendingCompaniesPage({super.key});
 
-  Future<void> _updateCompanyStatus(
-    BuildContext context,
-    String companyId,
-    String status,
-  ) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('companies')
-          .doc(companyId)
-          .update({
-        'status': status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Company $status successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error updating company status: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pending Companies'),
+        title: const Text('Pending Company Approvals'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('companies')
-            .where('status', isEqualTo: 'pending')
+            .collection('pending_companies')
             .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -115,7 +79,7 @@ class PendingCompaniesPage extends StatelessWidget {
   Widget _buildCompanyCard(
     BuildContext context,
     Map<String, dynamic> company,
-    String companyId,
+    String docId,
   ) {
     final name = company['name'] ?? 'Unknown Company';
     final industry = company['industry'] ?? 'Unknown Industry';
@@ -226,32 +190,28 @@ class PendingCompaniesPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _updateCompanyStatus(
-                      context,
-                      companyId,
-                      'approved',
-                    ),
-                    icon: const Icon(Icons.check),
-                    label: const Text('Approve'),
+                    onPressed: () => _approveCompany(context, docId, company),
+                    icon: const Icon(Icons.check, color: Colors.white),
+                    label: const Text('Approve', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _updateCompanyStatus(
-                      context,
-                      companyId,
-                      'rejected',
-                    ),
-                    icon: const Icon(Icons.close),
-                    label: const Text('Reject'),
+                    onPressed: () => _rejectCompany(context, docId, company),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    label: const Text('Reject', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -289,5 +249,103 @@ class PendingCompaniesPage extends StatelessWidget {
     if (timestamp == null) return 'Unknown';
     final date = timestamp.toDate();
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Future<void> _approveCompany(BuildContext context, String docId, Map<String, dynamic> companyData) async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Move company data to approved companies collection
+      await FirebaseFirestore.instance
+          .collection('companies')
+          .doc(companyData['uid'])
+          .set({
+        ...companyData,
+        'status': 'approved',
+        'approvedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Delete from pending companies collection
+      await FirebaseFirestore.instance
+          .collection('pending_companies')
+          .doc(docId)
+          .delete();
+
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Company approved successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error approving company: $e');
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectCompany(BuildContext context, String docId, Map<String, dynamic> companyData) async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Move company data to rejected companies collection (optional) or just delete
+      await FirebaseFirestore.instance
+          .collection('companies')
+          .doc(companyData['uid'])
+          .set({
+        ...companyData,
+        'status': 'rejected',
+        'rejectedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Delete from pending companies collection
+      await FirebaseFirestore.instance
+          .collection('pending_companies')
+          .doc(docId)
+          .delete();
+
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Company rejected successfully!'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error rejecting company: $e');
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

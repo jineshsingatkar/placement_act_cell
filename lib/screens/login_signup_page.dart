@@ -63,14 +63,42 @@ class _LoginSignupPageState extends State<LoginSignupPage>
 
         if (widget.role == 'Student') {
           final uid = FirebaseAuth.instance.currentUser?.uid;
-          final doc = await FirebaseFirestore.instance
+          
+          // First check if student is in pending_students collection
+          final pendingDoc = await FirebaseFirestore.instance
+              .collection('pending_students')
+              .doc(uid)
+              .get();
+
+          if (!mounted) return;
+
+          if (pendingDoc.exists) {
+            // Student is pending approval
+            showDialog(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text("Pending Approval"),
+                content: const Text("Your profile is under review by the TPO."),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("OK"),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
+          // Check if student is in approved students collection
+          final approvedDoc = await FirebaseFirestore.instance
               .collection('students')
               .doc(uid)
               .get();
 
           if (!mounted) return;
 
-          final data = doc.data();
+          final data = approvedDoc.data();
 
           if (data == null) {
             // Show profile completion if no record found
@@ -82,38 +110,60 @@ class _LoginSignupPageState extends State<LoginSignupPage>
             );
           } else {
             final status = data['status'];
-            if (status == 'pending') {
-              showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text("Pending Approval"),
-                  content: const Text("Your profile is under review by the TPO."),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("OK"),
-                    ),
-                  ],
+            if (status == 'approved') {
+              Navigator.pushReplacementNamed(context, '/student_dashboard');
+            } else if (status == 'rejected') {
+              showErrorDialog("Rejected", "Your profile was rejected by the TPO.");
+            } else {
+              // Fallback for any other status
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StudentProfileCompletionPage(fullName: data['fullName'] ?? 'Unknown'),
                 ),
               );
-            } else if (status == 'approved') {
-              Navigator.pushReplacementNamed(context, '/student_dashboard');
-            } else {
-              showErrorDialog("Rejected", "Your profile was rejected by the TPO.");
             }
           }
         }
 
         if (widget.role == 'Company') {
           final uid = FirebaseAuth.instance.currentUser?.uid;
-          final doc = await FirebaseFirestore.instance
+          
+          // First check if company is in pending_companies collection
+          final pendingDoc = await FirebaseFirestore.instance
+              .collection('pending_companies')
+              .doc(uid)
+              .get();
+
+          if (!mounted) return;
+
+          if (pendingDoc.exists) {
+            // Company is pending approval
+            showDialog(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text("Pending Approval"),
+                content: const Text("Your company profile is under review by the TPO."),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("OK"),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
+          // Check if company is in approved companies collection
+          final approvedDoc = await FirebaseFirestore.instance
               .collection('companies')
               .doc(uid)
               .get();
 
           if (!mounted) return;
 
-          final data = doc.data();
+          final data = approvedDoc.data();
 
           if (data == null) {
             // Show profile completion if no record found
@@ -125,29 +175,23 @@ class _LoginSignupPageState extends State<LoginSignupPage>
             );
           } else {
             final status = data['status'];
-            if (status == 'pending') {
-              showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text("Pending Approval"),
-                  content: const Text("Your company profile is under review by the TPO."),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("OK"),
-                    ),
-                  ],
-                ),
-              );
-            } else if (status == 'approved') {
+            if (status == 'approved') {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (_) => const CompanyDashboardPage(),
                 ),
               );
-            } else {
+            } else if (status == 'rejected') {
               showErrorDialog("Rejected", "Your company profile was rejected by the TPO.");
+            } else {
+              // Fallback for any other status
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CompanyProfileCompletionPage(companyName: data['name'] ?? 'Unknown'),
+                ),
+              );
             }
           }
         }

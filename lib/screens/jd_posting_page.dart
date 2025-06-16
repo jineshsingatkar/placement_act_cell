@@ -107,7 +107,7 @@ class _JDPostingPageState extends State<JDPostingPage> {
         'companyId': user.uid,
         'companyName': companyData['name'],
         'companyIndustry': companyData['industry'],
-        'status': 'active',
+        'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'applications': 0,
@@ -121,7 +121,7 @@ class _JDPostingPageState extends State<JDPostingPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Job posting created successfully!'),
+          content: Text('Job posting submitted successfully! Awaiting TPO approval.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -305,7 +305,7 @@ class _JDPostingPageState extends State<JDPostingPage> {
                           child: _buildTextField(
                             controller: _salaryController,
                             label: 'Salary Range',
-                            hint: 'e.g., $50,000 - $80,000',
+                            hint: 'e.g., \$50,000 - \$80,000',
                             icon: Icons.attach_money,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {

@@ -60,6 +60,7 @@ class _CompanyProfileCompletionPageState extends State<CompanyProfileCompletionP
       }
 
       final companyData = {
+        'uid': user.uid,
         'name': _nameController.text.trim(),
         'industry': _industryController.text.trim(),
         'website': _websiteController.text.trim(),
@@ -73,7 +74,7 @@ class _CompanyProfileCompletionPageState extends State<CompanyProfileCompletionP
       };
 
       await FirebaseFirestore.instance
-          .collection('companies')
+          .collection('pending_companies')
           .doc(user.uid)
           .set(companyData);
 
